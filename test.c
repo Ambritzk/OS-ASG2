@@ -66,8 +66,9 @@ void PopAndDelete(struct ProcessQueue* ptr){
 struct Process* Pop(struct ProcessQueue* ptr){
 	if(ptr->head == NULL) return NULL;
 	if(ptr->head->next == NULL){
-		free(ptr->head);
+		struct Process* temp = ptr->head;
 		ptr->head = ptr->tail = NULL;
+		return temp;
 	}
 	else{
 		struct Process* temp = ptr->head;
@@ -188,6 +189,7 @@ struct Process* ReadProcessesFromFile(int* sizeOfList){
 	return ListOfProcesses;
 }
 
+
 void SortProcesses(struct Process* ListOfProcesses, int num){
 	for(int i = 0; i < num - 1; i++){
 		for(int j = 0; j < num - 1 - i; j++){
@@ -292,6 +294,57 @@ void SimulateUpperQueue(int *time, struct Process* ListOfProcesses,int TotalProc
 }
 
 
+
+void SimulateHighestQueue(int* time, struct ProcessQueue* q, struct Process* ListOfProcess, int* index, int size, struct ProcessQueue* InferiorQueue){
+	size--;
+	int ind = *index;
+	struct Process* Proc = NULL;
+	while(ind != size){ //until we haven't processed the entire queue
+		if(Proc == NULL || *time == ListOfProcess[ind].arrival_time){
+			*time = ListOfProcess[ind].arrival_time;
+			while(ind < size && *time == ListOfProcess[ind].arrival_time){ // in case several processes arrive at the same time
+				printf("Time:%d -> %s arrives and enters Q1\n",*time,ListOfProcess[ind].pid);
+				Insert(q,&ListOfProcess[ind++]);
+			}
+
+			Proc = Pop(q);
+			Proc->TimeQuantum = q->TimeQuantum;
+		}
+		else{
+			if(*time + Proc->burst_time <= ListOfProcess[ind].arrival_time){
+				if(Proc->burst_time == Proc->TimeQuantum){
+					printf("Time: %d, Q1 executes %s for %d units -> %s finishes execution\n",*time,Proc->pid,Proc->burst_time,Proc->pid);
+				}
+				else{
+					printf("Time: %d, Q1 executes %s for %d units -> %s moves to Q2\n",*time,Proc->pid,Proc->TimeQuantum,Proc->pid);
+					Insert(InferiorQueue,Proc);
+				}
+				if(IsEmpty(q)){
+					Proc = NULL;
+				}
+				else{
+					Proc = Pop(q);
+				}
+				*time += Proc->TimeQuantum;
+			}
+			else{
+				//a process arrives while the current process is processing
+				
+			}
+		}
+	}
+	
+}
+void SimulateLowestQueue(int* time, struct ProcessQueue* q, struct Process* ListOfProcesses){
+
+	while(IsEmpty(q) == false){
+		struct Process* Proc = Pop(q);
+		printf("Time:%d, Q3 executes %s for %d units -> %s finishes execution\n",*time,Proc->pid,Proc->burst_time,Proc->pid);
+		*time += Proc->burst_time;
+	}
+	printf("Time:%d\n",*time);
+}
+
 void main(){
 	struct ProcessQueue pq = {2};
 	printf("%d\n",pq.TimeQuantum);
@@ -300,11 +353,11 @@ void main(){
 	struct Process* ListofProcesses = ReadProcessesFromFile(&number);
 	printf("%d",number);
 	SortProcesses(ListofProcesses,number);
-	SimulateScheduling(ListofProcesses,number);
-
+//	SimulateScheduling(ListofProcesses,number);
+	int time = 0;
+	SimulateLowestQueue(&time,&pq,ListofProcesses);
 
 	
 	free(ListofProcesses);
-	DisplayQueue(&pq);
 	FreeMemoryForProcessQueue(&pq);
 }
