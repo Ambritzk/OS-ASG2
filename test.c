@@ -253,21 +253,81 @@ void Scheduling(int*time, struct Process* ListOfPRocesses, int num,struct Proces
 }
 
 
-void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int num, int id, struct ProcessQueue* q2, struct ProcessQueue* q3){
+void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int num, int id,struct ProcessQueue* q1, struct ProcessQueue* q2, struct ProcessQueue* q3){
+	struct Process* proc = NULL;
+	int time_spent = -1;
+	bool TimeToQuit = false;
 	if(id == 2){
-
-	}
-	else{
-		struct Process* proc = NULL;
-		while(!IsEmpty(q3)){
+		while(!IsEmpty(q2)){
+			if(TimeToQuit){
+				return;
+			}
 			if(proc == NULL){
-				proc = Pop(q3);
+				proc = Pop(q2);
+				proc->TimeQuantum = q2->TimeQuantum;
 			}
 			else{
-				//complete dis
-				if(*time + proc->burst_time < ListOfProcesses[ind].arrival_time){
-					
+				proc->burst_time--;
+				proc->TimeQuantum--;
+				if(proc->burst_time == 0){
+					proc = NULL;	
 				}
+				else if(proc->TimeQuantum == 0){
+					if(proc != NULL){
+						Insert(q3,proc);
+						proc = NULL;
+					}
+				}
+
+				if(*time == ListOfProcesses[ind].arrival_time){
+					if(proc->burst_time > 0){
+						proc->interruptions += 1;
+						proc->interruptions %= 3;
+						if(proc->interruptions == 0){
+							Insert(q1,proc);
+						}
+						else{
+							if(proc->disrupt_flag){
+								proc->TimeQuantum = q2->TimeQuantum;
+							}
+							Insert(q2,proc);
+						}
+					}
+				}
+				*time += 1;
+			}
+		}
+	}
+	else{
+		while(!IsEmpty(q3)){
+			if(TimeToQuit){
+				return;
+			}
+			if(proc == NULL){
+				proc = Pop(q3);
+				time_spent = *time;
+			}
+			else{
+				proc->burst_time--;
+				if(proc->burst_time == 0){
+					printf("Q3 executes %s for %d units -> %s finishes execution\n",proc->pid,*time - time_spent,proc->pid);
+					proc = NULL;
+				}
+				if(*time == ListOfProcesses[ind].arrival_time){
+					if(proc->burst_time != 0){
+						proc->interruptions += 1;
+						proc->interruptions %= 3;
+						if(proc->interruptions == 0){
+							printf("Q3 executes %s for %d units -> %s is interrupted and pushed into Q2\n", proc->pid,*time - time_spent,proc->pid);
+							Insert(q2,proc);
+						}
+						else{
+							printf("Q3 executes %s for %d -> %s is interrupted and pushed to Q3\n",proc->pid,*time - time_spent, proc->pid);
+							Insert(q3,proc);
+						}
+					}
+				}
+				*time += 1;
 			}
 		}
 	}
