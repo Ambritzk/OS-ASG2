@@ -29,10 +29,12 @@ void DisplayProcess(struct Process *ptr){
 //Below is the code for processQueue
 struct ProcessQueue{
 	int TimeQuantum;
+	int Qid;
 	struct Process* head;
 	struct Process* tail;
 	struct ProcessQueue* InferiorQueue;
 	struct ProcessQueue* SuperiorQueue;
+
 	
 };
 
@@ -203,148 +205,73 @@ void SortProcesses(struct Process* ListOfProcesses, int num){
 }
 
 
-void SimulateUpperQueue(int *time, struct Process* ListOfProcesses,int TotalProcess, int *index, struct ProcessQueue* Queue){
-	//subtract 1 from TotalProcess to account for the fact that array indices start at 0
-	TotalProcess--;
-	struct Process* CurrentProcess = NULL;
-	int TimeQuantum = Queue->TimeQuantum;
-	while(*index != TotalProcess || IsEmpty(Queue) == false){
-
-		if(IsEmpty(Queue) == false || *time == ListOfProcesses[*index].arrival_time){
-
-
-
-
-
-
-			
-			if(*time == ListOfProcesses[*index].arrival_time){
-				//A new process has arrived
-				if(CurrentProcess == NULL){
-					//We don't have a current process
-					ListOfProcesses[*index].TimeQuantum = Queue->TimeQuantum;
-					Insert(Queue,&ListOfProcesses[*index]);
-					*index += 1;
-				}
-				else{
-					//we have a newly arrived process, but we have a process that's currently executing
-					//This is an interruption I suppose
-					ListOfProcesses[*index].burst_time = Queue->TimeQuantum;
-					Insert(Queue,&ListOfProcesses[*index]);
-					*index += 1;
-
-
-					CurrentProcess->interruptions++;
-					CurrentProcess->interruptions %= 3;
-					if(Queue->SuperiorQueue != NULL && CurrentProcess->interruptions == 0){
-						Insert(Queue->SuperiorQueue,CurrentProcess);
-					}
-					else{
-						if(CurrentProcess->disrupt_flag == 0){
-							CurrentProcess->TimeQuantum = Queue->TimeQuantum;
-						}
-						//else it'll be the Quantum - executed time
-						Insert(Queue,CurrentProcess);
-					}
-
-					CurrentProcess = NULL;
-					
-
-
-				}
-			}
-			
-			if(CurrentProcess == NULL && IsEmpty(Queue) == false){
-				CurrentProcess = Pop(Queue);
-			}
-
-			if(CurrentProcess != NULL){
-				//This means that we have a process at hand, that should be processing
-				//do dat doing
-				if(CurrentProcess->TimeQuantum == 0){
-					//The process has executed for the entire quantum assigned to it
-					if(CurrentProcess->burst_time == 0){
-						//The process has completed its execution in this time;
-						free(CurrentProcess);
-						CurrentProcess = NULL;
-					}
-					else{
-						//The process still has some burst time left, must be sent to the gulag
-						Insert(Queue->InferiorQueue,CurrentProcess);
-					}
-				}
-				else if(CurrentProcess->burst_time == 0){
-					//The process has completed its execution before the time quantum could expire
-					free(CurrentProcess);
-					CurrentProcess = NULL;
-				}
-				else{
-					//The time quantum hasn't expired, nor has the process finished execution.
-					//Must continue processing
-
-					CurrentProcess->burst_time--;
-					CurrentProcess->TimeQuantum--;
-				}
-
-			}
-		}
-		*time += 1;
-
-	}
-}
-
-
-
-void SimulateHighestQueue(int* time, struct ProcessQueue* q, struct Process* ListOfProcess, int* index, int size, struct ProcessQueue* InferiorQueue){
-	size--;
-	int ind = *index;
+void Scheduling(int*time, struct Process* ListOfPRocesses, int num,struct ProcessQueue* q,struct ProcessQueue* q2,struct ProcessQueue* q3){
+	int ind = 0;
 	struct Process* Proc = NULL;
-	while(ind != size){ //until we haven't processed the entire queue
-		if(Proc == NULL || *time == ListOfProcess[ind].arrival_time){
-			*time = ListOfProcess[ind].arrival_time;
-			while(ind < size && *time == ListOfProcess[ind].arrival_time){ // in case several processes arrive at the same time
-				printf("Time:%d -> %s arrives and enters Q1\n",*time,ListOfProcess[ind].pid);
-				Insert(q,&ListOfProcess[ind++]);
+	while(ind < num){
+		if(*time == ListOfPRocesses[ind].arrival_time){
+			if(Proc != NULL){ // if a process is currently executing, we push it back into the queu
+				Proc->burst_time--;
+				Proc->TimeQuantum--;
+				if(Proc->disrupt_flag){
+					Proc->TimeQuantum = q->TimeQuantum;
+				}
+				Proc->interruptions++;
+				Insert(q,Proc);
+				Proc = NULL;
 			}
-
-			Proc = Pop(q);
-			Proc->TimeQuantum = q->TimeQuantum;
+			Insert(q,&ListOfPRocesses[ind++]);
 		}
 		else{
-			if(*time + Proc->burst_time <= ListOfProcess[ind].arrival_time){
-				if(Proc->burst_time == Proc->TimeQuantum){
-					printf("Time: %d, Q1 executes %s for %d units -> %s finishes execution\n",*time,Proc->pid,Proc->burst_time,Proc->pid);
+			if(!IsEmpty(q)){
+				if(Proc == NULL){
+					Proc = Pop(q);
+					Proc->TimeQuantum = q->TimeQuantum;
 				}
-				else{
-					printf("Time: %d, Q1 executes %s for %d units -> %s moves to Q2\n",*time,Proc->pid,Proc->TimeQuantum,Proc->pid);
-					Insert(InferiorQueue,Proc);
-				}
-				if(IsEmpty(q)){
+				Proc->burst_time--;
+				Proc->TimeQuantum--;
+				if(Proc->TimeQuantum == 0){ // if time quantum ran out, but burst time didn't
+					if(Proc->burst_time != 0){
+						Insert(q2,Proc);
+					}
 					Proc = NULL;
 				}
-				else{
-					Proc = Pop(q);
-				}
-				*time += Proc->TimeQuantum;
+				else if(Proc->burst_time == 0){ // if burst time ran out but time quantum didn't
+					Proc = NULL;
+				}				
 			}
 			else{
-				//a process arrives while the current process is processing
-				
+				if(!IsEmpty(q2)){
+					struct Process* p2 = NULL;
+				}
+				else{
+
+				}
 			}
 		}
 	}
-	
 }
-void SimulateLowestQueue(int* time, struct ProcessQueue* q, struct Process* ListOfProcesses){
 
-	while(IsEmpty(q) == false){
-		struct Process* Proc = Pop(q);
-		printf("Time:%d, Q3 executes %s for %d units -> %s finishes execution\n",*time,Proc->pid,Proc->burst_time,Proc->pid);
-		*time += Proc->burst_time;
+
+void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int num, int id, struct ProcessQueue* q2, struct ProcessQueue* q3){
+	if(id == 2){
+
 	}
-	printf("Time:%d\n",*time);
+	else{
+		struct Process* proc = NULL;
+		while(!IsEmpty(q3)){
+			if(proc == NULL){
+				proc = Pop(q3);
+			}
+			else{
+				//complete dis
+				if(*time + proc->burst_time < ListOfProcesses[ind].arrival_time){
+					
+				}
+			}
+		}
+	}
 }
-
 void main(){
 	struct ProcessQueue pq = {2};
 	printf("%d\n",pq.TimeQuantum);
