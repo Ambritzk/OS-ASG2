@@ -36,7 +36,10 @@ struct ProcessQueue{
 
 	
 };
-
+void DisplayProcess(struct Process* ptr){
+	if(ptr == NULL) return;
+	printf("%s, ",ptr->pid);
+}
 void Insert(struct ProcessQueue* ptr, struct Process* proc){
 	
 	if(proc == NULL)return;
@@ -75,19 +78,19 @@ struct Process* Pop(struct ProcessQueue* ptr){
 		return temp;
 	}
 }
-// void DisplayQueue(struct ProcessQueue* ptr){
-// 	if(ptr->head == NULL){
-// 		printf("Empty\n");
-// 		return;
-// 	}
+void DisplayQueue(struct ProcessQueue* ptr){
+	if(ptr->head == NULL){
+		printf("Empty\n");
+		return;
+	}
 	
-// 	struct Process* temporary_ptr = ptr->head;
-// 	while(temporary_ptr != NULL){
-// 		DisplayProcess(temporary_ptr);
-// 		temporary_ptr = temporary_ptr->next;
-// 	}
+	struct Process* temporary_ptr = ptr->head;
+	while(temporary_ptr != NULL){
+		DisplayProcess(temporary_ptr);
+		temporary_ptr = temporary_ptr->next;
+	}
 
-// }
+ }
 bool IsEmpty(struct ProcessQueue* ptr){
 	return ptr->head == NULL;
 }
@@ -203,6 +206,7 @@ void SortProcesses(struct Process* ListOfProcesses, int num){
 	}
 }
 void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int num, int id,struct ProcessQueue* q1, struct ProcessQueue* q2, struct ProcessQueue* q3){
+
 	if(*time == ListOfProcesses[ind].arrival_time){
 		return;
 	}
@@ -320,7 +324,7 @@ void InitialScheduling(int*time, struct Process* ListOfProcesses, int num,struct
 				Insert(q1,&ListOfProcesses[ind++]);
 				
 				printf("Time:%d, %s arrived\n",*time,ListOfProcesses[ind - 1].pid);
-				 // if it's the last process, then we return since the next check will lead to a segmentation error
+				if(ind == num && Proc == NULL) return; // if it's the last process, then we return since the next check will lead to a segmentation error
 			}
 			
 		}
@@ -373,47 +377,69 @@ void InitialScheduling(int*time, struct Process* ListOfProcesses, int num,struct
 }
 
 void SimulateQueue(int* time, int id, struct ProcessQueue* q1,struct ProcessQueue* q2,struct ProcessQueue* q3){
+	
 	int time_start = 0;
-	struct ProcessQueue* q = (id == 1)?q1:q2;
 	struct Process* proc = NULL;
-	while(!IsEmpty(q) || proc != NULL){
-		if(proc == NULL){
-			proc = Pop(q);
-			proc->TimeQuantum = q->TimeQuantum;
-			time_start = *time;
-		}
-		else{
-			proc->burst_time--;
-			proc->TimeQuantum--;
-			*time += 1;
-			if(proc->burst_time == 0){
-				printf("Time:%d, ",*time);
-				if(id == 1){
-					printf("Q1 ");
-				}
-				else{
-					printf("Q2 ");
-				}
-				printf("executes %s for %d units -> %s finishes execution\n",proc->pid,*time - time_start,proc->pid);
-				proc->completion_time = *time;
-				proc = NULL;
-				
+	if(id == 1){
+		while(!IsEmpty(q1) || proc != NULL){
+			if(proc == NULL){
+				proc = Pop(q1);
+				proc->TimeQuantum = q1->TimeQuantum;
+				time_start = *time;
 			}
-			if(proc != NULL && proc->TimeQuantum == 0){
-				if(id == 1){
-					printf("Time:%d, Q1 executes %s for %d units -> %s moves to Q2\n",*time,proc->pid,*time - time_start, proc->pid);
+			else{
+				proc->TimeQuantum--;
+				proc->burst_time--;
+				*time += 1;
+				if(proc->burst_time == 0){
+					printf("Time:%d, Q1 executed %s for %d units -> %s finished execution\n",*time,proc->pid,*time - time_start,proc->pid);
+					proc->completion_time = *time;
+					proc = NULL;
+				}
+				if(proc != NULL && proc->TimeQuantum == 0){
+					printf("Time:%d, Q1 executed %s for %d units -> %s moved to Q2\n",*time,proc->pid,*time - time_start,proc->pid);
 					Insert(q2,proc);
+					proc = NULL;
 				}
-				else{
-					printf("Time:%d, Q2 executes %s for %d units -> %s moves to Q3\n",*time,proc->pid,*time - time_start, proc->pid);
-					Insert(q3,proc);
-				}
-				proc = NULL;
-				
+
+
 			}
-			
 		}
 	}
+	else if(id == 2){
+		while(!IsEmpty(q2) || proc != NULL){
+			if(proc == NULL){
+				proc = Pop(q2);
+				proc->TimeQuantum = q2->TimeQuantum;
+				time_start = *time;
+			}
+			else{
+				proc->TimeQuantum--;
+				proc->burst_time--;
+				*time += 1;
+				if(proc->burst_time == 0){
+					printf("Time:%d, Q2 executed %s for %d units -> %s finished execution\n",*time,proc->pid,*time - time_start,proc->pid);
+					proc->completion_time = *time;
+					proc = NULL;
+				}
+				if(proc != NULL && proc->TimeQuantum == 0){
+					printf("Time:%d, Q2 executed %s for %d units -> %s moved to Q3\n",*time,proc->pid,*time - time_start,proc->pid);
+					Insert(q3,proc);
+					proc = NULL;
+				}
+
+
+			}
+			printf("Q2:");
+			DisplayQueue(q2);
+			printf("\nQ3:");
+			DisplayQueue(q3);
+			printf("\n");
+		}
+	}
+
+
+
 }
 
 void SimulateLowest(int* time, struct ProcessQueue* q3){
@@ -425,7 +451,7 @@ void SimulateLowest(int* time, struct ProcessQueue* q3){
 	
 	while(!IsEmpty(q3) || proc != NULL){
 		
-		if(proc == NULL){
+		if(proc == NULL || proc->burst_time == 0){
 			proc = Pop(q3);
 			time_start = *time;
 		}
@@ -435,7 +461,6 @@ void SimulateLowest(int* time, struct ProcessQueue* q3){
 			if(proc->burst_time == 0){
 				printf("Time:%d, Q3 executes %s for %d units -> %s finishes execution\n",*time,proc->pid, *time - time_start, proc->pid);
 				proc->completion_time = *time;
-				printf("%d\n",proc->completion_time);
 				proc = NULL;
 			}
 		}
@@ -446,10 +471,11 @@ void SimulateLowest(int* time, struct ProcessQueue* q3){
 void final(int*time, struct Process* ListOfProcesses, int num,struct ProcessQueue* q1,struct ProcessQueue* q2,struct ProcessQueue* q3){
 	
 	InitialScheduling(time,ListOfProcesses,num,q1,q2,q3);
+	printf("Initial ended here\n");
 	while(!IsEmpty(q1) || !IsEmpty(q2) || !IsEmpty(q3)){
 		SimulateQueue(time,1,q1,q2,q3);
-		printf("Initial ended here\n");
 		SimulateQueue(time,2,q1,q2,q3);
+
 		SimulateLowest(time,q3);
 	}
 }
