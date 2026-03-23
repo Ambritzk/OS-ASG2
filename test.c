@@ -11,6 +11,8 @@ struct Process{
 	int interruptions;
 	int TimeQuantum;
 	struct Process* next;
+	int original_burst;
+	int completion_time;
 };
 void Deepcopy(struct Process* dest, struct Process *source){
 	dest->arrival_time = source->arrival_time;
@@ -22,9 +24,9 @@ void Deepcopy(struct Process* dest, struct Process *source){
 	dest->TimeQuantum = source->TimeQuantum;
 }
 
-void DisplayProcess(struct Process *ptr){
-	printf("Process Name: %s, arv = %d, brst = %d, dsrpt %d\n", ptr->pid, ptr->arrival_time, ptr->burst_time, ptr->disrupt_flag);
-}
+
+
+
 
 //Below is the code for processQueue
 struct ProcessQueue{
@@ -37,9 +39,7 @@ struct ProcessQueue{
 
 void Insert(struct ProcessQueue* ptr, struct Process* proc){
 	
-	struct Process* newProcess = proc;
-	if (newProcess == NULL) return;
-	Deepcopy(newProcess, proc);
+	if(proc == NULL)return;
 
 	if(ptr->head == NULL){
 		ptr->head = ptr->tail = proc;
@@ -75,19 +75,19 @@ struct Process* Pop(struct ProcessQueue* ptr){
 		return temp;
 	}
 }
-void DisplayQueue(struct ProcessQueue* ptr){
-	if(ptr->head == NULL){
-		printf("Empty\n");
-		return;
-	}
+// void DisplayQueue(struct ProcessQueue* ptr){
+// 	if(ptr->head == NULL){
+// 		printf("Empty\n");
+// 		return;
+// 	}
 	
-	struct Process* temporary_ptr = ptr->head;
-	while(temporary_ptr != NULL){
-		DisplayProcess(temporary_ptr);
-		temporary_ptr = temporary_ptr->next;
-	}
+// 	struct Process* temporary_ptr = ptr->head;
+// 	while(temporary_ptr != NULL){
+// 		DisplayProcess(temporary_ptr);
+// 		temporary_ptr = temporary_ptr->next;
+// 	}
 
-}
+// }
 bool IsEmpty(struct ProcessQueue* ptr){
 	return ptr->head == NULL;
 }
@@ -168,6 +168,7 @@ struct Process* ReadProcessesFromFile(int* sizeOfList){
 			ListOfProcesses[ind].disrupt_flag = atoi(dsprs);
 			ListOfProcesses[ind].interruptions = 0;
 			ListOfProcesses[ind].TimeQuantum = - 1;
+			ListOfProcesses[ind].original_burst = atoi(brst);
 			strcpy(ListOfProcesses[ind].pid,pid);
 
 			*sizeOfList = ++ind;
@@ -180,6 +181,7 @@ struct Process* ReadProcessesFromFile(int* sizeOfList){
 			ListOfProcesses[ind].disrupt_flag = atoi(dsprs);
 			ListOfProcesses[ind].interruptions = 0;
 			ListOfProcesses[ind].TimeQuantum = - 1;
+			ListOfProcesses[ind].original_burst = atoi(brst);
 			strcpy(ListOfProcesses[ind].pid,pid);
 			*sizeOfList = ++ind;
 		}
@@ -201,9 +203,16 @@ void SortProcesses(struct Process* ListOfProcesses, int num){
 	}
 }
 void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int num, int id,struct ProcessQueue* q1, struct ProcessQueue* q2, struct ProcessQueue* q3){
+	if(*time == ListOfProcesses[ind].arrival_time){
+		return;
+	}
+	
 	struct Process* proc = NULL;
 	int time_start = -1;
 	if(id == 2){
+		if(IsEmpty(q2)){
+			return;
+		}
 		while(ind < num && (!IsEmpty(q2) || proc != NULL)){
 			
 			if(proc == NULL){
@@ -216,12 +225,13 @@ void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int
 				proc->TimeQuantum--;
 				*time += 1;
 				if(proc->burst_time == 0){
-					printf("Q2 executed %s for %d units -> %s finished execution\n",proc->pid, *time - time_start, proc->pid);
+					printf("Time:%d, Q2 executed %s for %d units -> %s finished execution\n",*time,proc->pid, *time - time_start, proc->pid);
+					proc->completion_time = *time;
 					proc = NULL;	
 				}
 				else if(proc->TimeQuantum == 0){
 					if(proc != NULL){
-						printf("Q2 executed %s for %d units -> %s moved to Q3\n",proc->pid, *time - time_start, proc->pid);
+						printf("Time:%d, Q2 executed %s for %d units -> %s moved to Q3\n",*time,proc->pid, *time - time_start, proc->pid);
 						Insert(q3,proc);
 						proc = NULL;
 					}
@@ -236,14 +246,14 @@ void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int
 						proc->interruptions += 1;
 						proc->interruptions %= 3;
 						if(proc->interruptions == 0){
-							printf("Q2 executes %s for %d units -> %s is interrupted and moves to Q1\n",proc->pid, *time - time_start, proc->pid);
+							printf("Time:%d, Q2 executes %s for %d units -> %s is interrupted and moves to Q1\n",*time,proc->pid, *time - time_start, proc->pid);
 							Insert(q1,proc);
 						}
 						else{
 							if(proc->disrupt_flag == 0){
 								proc->TimeQuantum = q2->TimeQuantum;
 							}
-							printf("Q2 executes %s for %d units -> %s is interrupted and moves to Q2\n",proc->pid, *time - time_start, proc->pid);
+							printf("Time:%d, Q2 executes %s for %d units -> %s is interrupted and moves to Q2\n",*time,proc->pid, *time - time_start, proc->pid);
 							Insert(q2,proc);
 						}
 						return;
@@ -252,16 +262,11 @@ void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int
 				
 			}
 		}
-		if(*time < ListOfProcesses[ind].arrival_time){
-			if(IsEmpty(q3)){
-				return;
-			}
-			else{
-				TemporaryExecution(time,ListOfProcesses,ind,num,3,q1,q2,q3);
-			}
-		}
 	}
 	else{
+		if(IsEmpty(q3)){
+			return;
+		}
 		while(!IsEmpty(q3) || proc != NULL){ //  This queue operates on FCFS basis
 			if(proc == NULL){
 				proc = Pop(q3);
@@ -271,7 +276,8 @@ void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int
 				proc->burst_time--;
 				*time += 1;
 				if(proc->burst_time == 0){
-					printf("Q3 executes %s for %d units -> %s finishes execution\n",proc->pid,*time - time_start,proc->pid);
+					printf("Time:%d, Q3 executes %s for %d units -> %s finishes execution\n",*time,proc->pid,*time - time_start,proc->pid);
+					proc->completion_time = *time;
 					proc = NULL;
 				}
 				if(*time == ListOfProcesses[ind].arrival_time){
@@ -283,11 +289,11 @@ void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int
 						proc->interruptions += 1;
 						proc->interruptions %= 3;
 						if(proc->interruptions == 0){
-							printf("Q3 executes %s for %d units -> %s is interrupted and pushed into Q2\n", proc->pid,*time - time_start,proc->pid);
+							printf("Time:%d, Q3 executes %s for %d units -> %s is interrupted and pushed into Q2\n",*time,proc->pid,*time - time_start,proc->pid);
 							Insert(q2,proc);
 						}
 						else{
-							printf("Q3 executes %s for %d -> %s is interrupted and pushed to Q3\n",proc->pid,*time - time_start, proc->pid);
+							printf("Time:%d, Q3 executes %s for %d -> %s is interrupted and pushed to Q3\n",*time,proc->pid,*time - time_start, proc->pid);
 							Insert(q3,proc);
 						}
 						return;
@@ -304,23 +310,19 @@ void InitialScheduling(int*time, struct Process* ListOfProcesses, int num,struct
 	int ind = 0;
 	struct Process* Proc = NULL;
 	int time_start = -1;
-	while(ind < num){
+	int ab = -1;
+	while(ind <= num){
+		if(Proc == NULL && ind == num) return;
 		if(*time == ListOfProcesses[ind].arrival_time){
-			if(Proc != NULL){
-				Proc->interruptions++;
-				Proc->interruptions %= 3;
-				if(Proc->disrupt_flag == 0){
-					Proc->TimeQuantum = q1->TimeQuantum;
-				}
-				printf("Time:%d Q1 executed %s for %d units -> %s is interrupted and moved to Q1\n",*time,Proc->pid,*time - time_start,Proc->pid);
+			
+			while(*time == ListOfProcesses[ind].arrival_time){
+
+				Insert(q1,&ListOfProcesses[ind++]);
+				
+				printf("Time:%d, %s arrived\n",*time,ListOfProcesses[ind - 1].pid);
+				 // if it's the last process, then we return since the next check will lead to a segmentation error
 			}
-			Insert(q1,&ListOfProcesses[ind++]);
-			if(Proc != NULL){
-				Insert(q1,Proc);
-				Proc = NULL;
-			}
-			printf("Time:%d, %s arrived\n",*time,ListOfProcesses[ind - 1].pid);
-			if(ind == num) return; // if it's the last process, then we return
+			
 		}
 		else{
 			if(!IsEmpty(q1) || Proc != NULL){
@@ -329,25 +331,39 @@ void InitialScheduling(int*time, struct Process* ListOfProcesses, int num,struct
 					Proc->TimeQuantum = q1->TimeQuantum;
 					time_start = *time;
 				}
+
 				Proc->burst_time--;
 				Proc->TimeQuantum--;
 				*time += 1;
+				
+
+				
 				if(Proc->burst_time == 0){
 					printf("Time:%d, Q1 executes %s for %d -> %s finishes execution\n",*time,Proc->pid,*time - time_start,Proc->pid);
+					Proc->completion_time = *time;
 					Proc = NULL;
 				}				
+
+
 				if(Proc != NULL && Proc->TimeQuantum == 0){
+					
 					printf("Time:%d, Q1 executes %s for %d units -> %s moves to Q2\n",*time,Proc->pid,*time - time_start,Proc->pid);
 					Insert(q2,Proc);
 					Proc = NULL;
 				}
 
+				if(Proc == NULL && ind == num){
+					return;
+				} 
+				
+				
 			}
 			else{
 				TemporaryExecution(time,ListOfProcesses,ind,num,2,q1,q2,q3);
+				TemporaryExecution(time,ListOfProcesses,ind,num,3,q1,q2,q3);
 				if(*time < ListOfProcesses[ind].arrival_time){
 					printf("Q1 remains idle for %d units since no process in any of the queues\n", ListOfProcesses[ind].arrival_time - *time);
-					*time = ListOfProcesses[ind].arrival_time;
+					*time = ListOfProcesses[ind].arrival_time; // next iteration will handle this
 				}
 			}
 		}
@@ -355,9 +371,6 @@ void InitialScheduling(int*time, struct Process* ListOfProcesses, int num,struct
 
 
 }
-
-
-
 
 void SimulateQueue(int* time, int id, struct ProcessQueue* q1,struct ProcessQueue* q2,struct ProcessQueue* q3){
 	int time_start = 0;
@@ -382,6 +395,7 @@ void SimulateQueue(int* time, int id, struct ProcessQueue* q1,struct ProcessQueu
 					printf("Q2 ");
 				}
 				printf("executes %s for %d units -> %s finishes execution\n",proc->pid,*time - time_start,proc->pid);
+				proc->completion_time = *time;
 				proc = NULL;
 				
 			}
@@ -420,6 +434,8 @@ void SimulateLowest(int* time, struct ProcessQueue* q3){
 			*time += 1;
 			if(proc->burst_time == 0){
 				printf("Time:%d, Q3 executes %s for %d units -> %s finishes execution\n",*time,proc->pid, *time - time_start, proc->pid);
+				proc->completion_time = *time;
+				printf("%d\n",proc->completion_time);
 				proc = NULL;
 			}
 		}
@@ -432,8 +448,19 @@ void final(int*time, struct Process* ListOfProcesses, int num,struct ProcessQueu
 	InitialScheduling(time,ListOfProcesses,num,q1,q2,q3);
 	while(!IsEmpty(q1) || !IsEmpty(q2) || !IsEmpty(q3)){
 		SimulateQueue(time,1,q1,q2,q3);
+		printf("Initial ended here\n");
 		SimulateQueue(time,2,q1,q2,q3);
 		SimulateLowest(time,q3);
+	}
+}
+
+void FinalTable(struct Process* ListOfProcesses, int sized){
+	printf("P\tAT\tBT\tCT\tTAT\tWT\n");
+	for(int i = 0; i < sized; i++){
+		struct Process* proc = &ListOfProcesses[i];
+		int tat = proc->completion_time - proc->arrival_time;
+		int wait = tat - proc->original_burst;
+		printf("%s\t%d\t%d\t%d\t%d\t%d\n",proc->pid, proc->arrival_time, proc->original_burst,proc->completion_time,tat,wait);
 	}
 }
 
@@ -454,7 +481,7 @@ void main(){
 	struct ProcessQueue q3 = {2,NULL,NULL};
 	final(&time,ListOfProcesses,number,&q1,&q2,&q3);
 	printf("We here\n");
-
+	FinalTable(ListOfProcesses,number);
 	
 	free(ListOfProcesses);
 }
