@@ -4,7 +4,7 @@
 #include<stdbool.h>
 
 struct Process{
-	char pid[2];
+	char* pid;
 	int arrival_time;
 	int burst_time;
 	bool disrupt_flag;
@@ -25,15 +25,94 @@ void Deepcopy(struct Process* dest, struct Process *source){
 }
 
 
+struct  GanttNode{
+	char* name;
+	int start;
+	int end;
+	struct GanttNode* next;
+};
+
+struct GanttQueue{
+	struct GanttNode* head;
+	struct GanttNode* tail;	
+};
+bool IsChartEmpty(struct GanttQueue* q){
+	return (q->head == NULL);
+}
+
+void GanttInsert(struct GanttQueue* q,struct Process* proc, int start, int end){
+	
+	struct GanttNode* node = (struct GanttNode*) malloc(sizeof(struct GanttNode));
+	
+	if(end == -1){
+		node->name = (char* ) malloc(sizeof(char) * (5));
+		strcpy(node->name,"Idle");
+	}
+	else{
+		
+		node->name = (char*) malloc(sizeof(char) * (strlen(proc->pid) + 1));
+		
+		strcpy(node->name,proc->pid);
+	}
+		
+	node->end = end;
+	node->start = start;
+	node->next = NULL;
+
+	
+	if(IsChartEmpty(q)){
+		
+		q->head = q->tail = node;
+	}
+	else{
+		q->tail->next = node;
+		q->tail = node;
+	}
+	
+
+}
+void GanttDisplay(struct GanttQueue* q){
+	if(q == NULL || IsChartEmpty(q)){
+		return;
+	}
+	struct GanttNode* temp = q->head;
+	while(temp != NULL){
+		printf("%s\t|",temp->name);
+		temp = temp->next;
+	}
+	temp = q->head;
+	printf("\n");
+	while(temp != NULL){
+		if(temp->start == -1){
+			printf("%d\t|",temp->start);
+		}
+		else{
+			printf("%d\t|",temp->start);
+		}
+		temp = temp->next;
+	}
+
+}
+void FreeChart(struct GanttQueue* q){
+	if(IsChartEmpty(q)){
+		return;
+	}
+	struct GanttNode* temp = q->head;
+	while(temp != NULL){
+		free(temp->name);
+		free(temp);
+		temp = temp->next;
+	}
 
 
+}
 
 //Below is the code for processQueue
 struct ProcessQueue{
 	int TimeQuantum;
 	struct Process* head;
 	struct Process* tail;
-
+	
 	
 };
 void DisplayProcess(struct Process* ptr){
@@ -52,19 +131,7 @@ void Insert(struct ProcessQueue* ptr, struct Process* proc){
 		ptr->tail = proc;
 	}
 }
-void PopAndDelete(struct ProcessQueue* ptr){
-	if(ptr->head == NULL) return;
-	if(ptr->head->next == NULL){
-		free(ptr->head);
-		ptr->head = ptr->tail = NULL;
-	}
-	else{
-		struct Process* temp = ptr->head;
-		ptr->head = temp->next;
-		free(temp);
-	}
-	
-}
+
 struct Process* Pop(struct ProcessQueue* ptr){
 	if(ptr->head == NULL) return NULL;
 	if(ptr->head->next == NULL){
@@ -75,6 +142,7 @@ struct Process* Pop(struct ProcessQueue* ptr){
 	else{
 		struct Process* temp = ptr->head;
 		ptr->head = temp->next;
+		temp->next = NULL;
 		return temp;
 	}
 }
@@ -172,6 +240,7 @@ struct Process* ReadProcessesFromFile(int* sizeOfList){
 			ListOfProcesses[ind].interruptions = 0;
 			ListOfProcesses[ind].TimeQuantum = - 1;
 			ListOfProcesses[ind].original_burst = atoi(brst);
+			ListOfProcesses[ind].pid = (char*) malloc(sizeof(char) * (strlen(pid) + 1));
 			strcpy(ListOfProcesses[ind].pid,pid);
 
 			*sizeOfList = ++ind;
@@ -185,6 +254,7 @@ struct Process* ReadProcessesFromFile(int* sizeOfList){
 			ListOfProcesses[ind].interruptions = 0;
 			ListOfProcesses[ind].TimeQuantum = - 1;
 			ListOfProcesses[ind].original_burst = atoi(brst);
+			ListOfProcesses[ind].pid = (char*) malloc(sizeof(char) * (strlen(pid) + 1));
 			strcpy(ListOfProcesses[ind].pid,pid);
 			*sizeOfList = ++ind;
 		}
@@ -205,7 +275,7 @@ void SortProcesses(struct Process* ListOfProcesses, int num){
 		}
 	}
 }
-void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int num, int id,struct ProcessQueue* q1, struct ProcessQueue* q2, struct ProcessQueue* q3){
+void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int num, int id,struct ProcessQueue* q1, struct ProcessQueue* q2, struct ProcessQueue* q3,struct GanttQueue* gq){
 
 	if(*time == ListOfProcesses[ind].arrival_time){
 		return;
@@ -230,12 +300,14 @@ void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int
 				*time += 1;
 				if(proc->burst_time == 0){
 					printf("Time:%d, Q2 executed %s for %d units -> %s finished execution\n",*time,proc->pid, *time - time_start, proc->pid);
+					GanttInsert(gq,proc,time_start,*time);
 					proc->completion_time = *time;
 					proc = NULL;	
 				}
 				else if(proc->TimeQuantum == 0){
 					if(proc != NULL){
 						printf("Time:%d, Q2 executed %s for %d units -> %s moved to Q3\n",*time,proc->pid, *time - time_start, proc->pid);
+						GanttInsert(gq,proc,time_start,*time);
 						Insert(q3,proc);
 						proc = NULL;
 					}
@@ -251,6 +323,7 @@ void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int
 						proc->interruptions %= 3;
 						if(proc->interruptions == 0){
 							printf("Time:%d, Q2 executes %s for %d units -> %s is interrupted and moves to Q1\n",*time,proc->pid, *time - time_start, proc->pid);
+							GanttInsert(gq,proc,time_start,*time);
 							Insert(q1,proc);
 						}
 						else{
@@ -258,6 +331,7 @@ void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int
 								proc->TimeQuantum = q2->TimeQuantum;
 							}
 							printf("Time:%d, Q2 executes %s for %d units -> %s is interrupted and moves to Q2\n",*time,proc->pid, *time - time_start, proc->pid);
+							GanttInsert(gq,proc,time_start,*time);
 							Insert(q2,proc);
 						}
 						return;
@@ -281,6 +355,8 @@ void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int
 				*time += 1;
 				if(proc->burst_time == 0){
 					printf("Time:%d, Q3 executes %s for %d units -> %s finishes execution\n",*time,proc->pid,*time - time_start,proc->pid);
+					GanttInsert(gq,proc,time_start,*time);
+					
 					proc->completion_time = *time;
 					proc = NULL;
 				}
@@ -294,10 +370,12 @@ void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int
 						proc->interruptions %= 3;
 						if(proc->interruptions == 0){
 							printf("Time:%d, Q3 executes %s for %d units -> %s is interrupted and pushed into Q2\n",*time,proc->pid,*time - time_start,proc->pid);
+							GanttInsert(gq,proc,time_start,*time);
 							Insert(q2,proc);
 						}
 						else{
 							printf("Time:%d, Q3 executes %s for %d -> %s is interrupted and pushed to Q3\n",*time,proc->pid,*time - time_start, proc->pid);
+							GanttInsert(gq,proc,time_start,*time);
 							Insert(q3,proc);
 						}
 						return;
@@ -310,7 +388,7 @@ void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int
 }
 
 
-void InitialScheduling(int*time, struct Process* ListOfProcesses, int num,struct ProcessQueue* q1,struct ProcessQueue* q2,struct ProcessQueue* q3){
+void InitialScheduling(int*time, struct Process* ListOfProcesses, int num,struct ProcessQueue* q1,struct ProcessQueue* q2,struct ProcessQueue* q3,struct GanttQueue* gq){
 	int ind = 0;
 	struct Process* Proc = NULL;
 	int time_start = -1;
@@ -344,6 +422,7 @@ void InitialScheduling(int*time, struct Process* ListOfProcesses, int num,struct
 				
 				if(Proc->burst_time == 0){
 					printf("Time:%d, Q1 executes %s for %d -> %s finishes execution\n",*time,Proc->pid,*time - time_start,Proc->pid);
+					GanttInsert(gq,Proc,time_start,*time);
 					Proc->completion_time = *time;
 					Proc = NULL;
 				}				
@@ -352,6 +431,7 @@ void InitialScheduling(int*time, struct Process* ListOfProcesses, int num,struct
 				if(Proc != NULL && Proc->TimeQuantum == 0){
 					
 					printf("Time:%d, Q1 executes %s for %d units -> %s moves to Q2\n",*time,Proc->pid,*time - time_start,Proc->pid);
+					GanttInsert(gq,Proc,time_start,*time);
 					Insert(q2,Proc);
 					Proc = NULL;
 				}
@@ -363,10 +443,11 @@ void InitialScheduling(int*time, struct Process* ListOfProcesses, int num,struct
 				
 			}
 			else{
-				TemporaryExecution(time,ListOfProcesses,ind,num,2,q1,q2,q3);
-				TemporaryExecution(time,ListOfProcesses,ind,num,3,q1,q2,q3);
+				TemporaryExecution(time,ListOfProcesses,ind,num,2,q1,q2,q3,gq);
+				TemporaryExecution(time,ListOfProcesses,ind,num,3,q1,q2,q3,gq);
 				if(*time < ListOfProcesses[ind].arrival_time){
 					printf("Q1 remains idle for %d units since no process in any of the queues\n", ListOfProcesses[ind].arrival_time - *time);
+					GanttInsert(gq,NULL,*time,-1);
 					*time = ListOfProcesses[ind].arrival_time; // next iteration will handle this
 				}
 			}
@@ -376,7 +457,7 @@ void InitialScheduling(int*time, struct Process* ListOfProcesses, int num,struct
 
 }
 
-void SimulateQueue(int* time, int id, struct ProcessQueue* q1,struct ProcessQueue* q2,struct ProcessQueue* q3){
+void SimulateQueue(int* time, int id, struct ProcessQueue* q1,struct ProcessQueue* q2,struct ProcessQueue* q3,struct GanttQueue* gq){
 	
 	int time_start = 0;
 	struct Process* proc = NULL;
@@ -393,11 +474,13 @@ void SimulateQueue(int* time, int id, struct ProcessQueue* q1,struct ProcessQueu
 				*time += 1;
 				if(proc->burst_time == 0){
 					printf("Time:%d, Q1 executed %s for %d units -> %s finished execution\n",*time,proc->pid,*time - time_start,proc->pid);
+					GanttInsert(gq,proc,time_start,*time);
 					proc->completion_time = *time;
 					proc = NULL;
 				}
 				if(proc != NULL && proc->TimeQuantum == 0){
 					printf("Time:%d, Q1 executed %s for %d units -> %s moved to Q2\n",*time,proc->pid,*time - time_start,proc->pid);
+					GanttInsert(gq,proc,time_start,*time);
 					Insert(q2,proc);
 					proc = NULL;
 				}
@@ -419,22 +502,19 @@ void SimulateQueue(int* time, int id, struct ProcessQueue* q1,struct ProcessQueu
 				*time += 1;
 				if(proc->burst_time == 0){
 					printf("Time:%d, Q2 executed %s for %d units -> %s finished execution\n",*time,proc->pid,*time - time_start,proc->pid);
+					GanttInsert(gq,proc,time_start,*time);
 					proc->completion_time = *time;
 					proc = NULL;
 				}
 				if(proc != NULL && proc->TimeQuantum == 0){
 					printf("Time:%d, Q2 executed %s for %d units -> %s moved to Q3\n",*time,proc->pid,*time - time_start,proc->pid);
+					GanttInsert(gq,proc,time_start,*time);
 					Insert(q3,proc);
 					proc = NULL;
 				}
 
 
 			}
-			printf("Q2:");
-			DisplayQueue(q2);
-			printf("\nQ3:");
-			DisplayQueue(q3);
-			printf("\n");
 		}
 	}
 
@@ -442,7 +522,7 @@ void SimulateQueue(int* time, int id, struct ProcessQueue* q1,struct ProcessQueu
 
 }
 
-void SimulateLowest(int* time, struct ProcessQueue* q3){
+void SimulateLowest(int* time, struct ProcessQueue* q3,struct GanttQueue* gq){
 	if(IsEmpty(q3)){
 		return;
 	}
@@ -451,7 +531,7 @@ void SimulateLowest(int* time, struct ProcessQueue* q3){
 	
 	while(!IsEmpty(q3) || proc != NULL){
 		
-		if(proc == NULL || proc->burst_time == 0){
+		if(proc == NULL){
 			proc = Pop(q3);
 			time_start = *time;
 		}
@@ -460,6 +540,7 @@ void SimulateLowest(int* time, struct ProcessQueue* q3){
 			*time += 1;
 			if(proc->burst_time == 0){
 				printf("Time:%d, Q3 executes %s for %d units -> %s finishes execution\n",*time,proc->pid, *time - time_start, proc->pid);
+				GanttInsert(gq,proc,time_start,*time);
 				proc->completion_time = *time;
 				proc = NULL;
 			}
@@ -468,15 +549,15 @@ void SimulateLowest(int* time, struct ProcessQueue* q3){
 }
 
 
-void final(int*time, struct Process* ListOfProcesses, int num,struct ProcessQueue* q1,struct ProcessQueue* q2,struct ProcessQueue* q3){
+void final(int*time, struct Process* ListOfProcesses, int num,struct ProcessQueue* q1,struct ProcessQueue* q2,struct ProcessQueue* q3, struct GanttQueue* gq){
 	
-	InitialScheduling(time,ListOfProcesses,num,q1,q2,q3);
+	InitialScheduling(time,ListOfProcesses,num,q1,q2,q3,gq);
 	printf("Initial ended here\n");
 	while(!IsEmpty(q1) || !IsEmpty(q2) || !IsEmpty(q3)){
-		SimulateQueue(time,1,q1,q2,q3);
-		SimulateQueue(time,2,q1,q2,q3);
+		SimulateQueue(time,1,q1,q2,q3,gq);
+		SimulateQueue(time,2,q1,q2,q3,gq);
 
-		SimulateLowest(time,q3);
+		SimulateLowest(time,q3,gq);
 	}
 }
 
@@ -494,20 +575,34 @@ void FinalTable(struct Process* ListOfProcesses, int sized){
 
 void main(){
 	struct ProcessQueue pq = {2};
-	printf("%d\n",pq.TimeQuantum);
-
+	struct GanttQueue gq = {NULL,NULL};
 	int number = 0;
 	struct Process* ListOfProcesses = ReadProcessesFromFile(&number);
-	printf("%d",number);
 	SortProcesses(ListOfProcesses,number);
-//	SimulateScheduling(ListOfProcesses,number);
 	int time = 0;
 	struct ProcessQueue q1 = {2,NULL,NULL};
 	struct ProcessQueue q2 = {4,NULL,NULL};
-	struct ProcessQueue q3 = {2,NULL,NULL};
-	final(&time,ListOfProcesses,number,&q1,&q2,&q3);
-	printf("We here\n");
+	struct ProcessQueue q3 = {-1,NULL,NULL};
+
+
+
+
+	final(&time,ListOfProcesses,number,&q1,&q2,&q3,&gq);
+	printf("GANTT CHART\n");
+	GanttDisplay(&gq);
+	printf("\nFINAL TABLE\n");
+
+
+
+
 	FinalTable(ListOfProcesses,number);
 	
+	for(int i = 0; i < number; i++){
+		free(ListOfProcesses[i].pid);
+	}
+
+
+	FreeChart(&gq);
 	free(ListOfProcesses);
+
 }
