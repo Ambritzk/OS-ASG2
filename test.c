@@ -89,6 +89,9 @@ void GanttDisplay(struct GanttQueue* q){
 		else{
 			printf("%d\t|",temp->start);
 		}
+		if(temp->next == NULL){
+			printf("%d",temp->end);
+		}
 		temp = temp->next;
 	}
 
@@ -322,7 +325,7 @@ void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int
 						proc->interruptions += 1;
 						proc->interruptions %= 3;
 						if(proc->interruptions == 0){
-							printf("Time:%d, Q2 executes %s for %d units -> %s is interrupted and moves to Q1\n",*time,proc->pid, *time - time_start, proc->pid);
+							printf("Time:%d, Q2 executes %s for %d units -> %s is interrupted and moves to Q1 (PROMOTED!)\n",*time,proc->pid, *time - time_start, proc->pid);
 							GanttInsert(gq,proc,time_start,*time);
 							Insert(q1,proc);
 						}
@@ -369,7 +372,7 @@ void TemporaryExecution(int* time, struct Process* ListOfProcesses, int ind, int
 						proc->interruptions += 1;
 						proc->interruptions %= 3;
 						if(proc->interruptions == 0){
-							printf("Time:%d, Q3 executes %s for %d units -> %s is interrupted and pushed into Q2\n",*time,proc->pid,*time - time_start,proc->pid);
+							printf("Time:%d, Q3 executes %s for %d units -> %s is interrupted and pushed into Q2 (PROMOTED!)\n",*time,proc->pid,*time - time_start,proc->pid);
 							GanttInsert(gq,proc,time_start,*time);
 							Insert(q2,proc);
 						}
@@ -552,7 +555,6 @@ void SimulateLowest(int* time, struct ProcessQueue* q3,struct GanttQueue* gq){
 void final(int*time, struct Process* ListOfProcesses, int num,struct ProcessQueue* q1,struct ProcessQueue* q2,struct ProcessQueue* q3, struct GanttQueue* gq){
 	
 	InitialScheduling(time,ListOfProcesses,num,q1,q2,q3,gq);
-	printf("Initial ended here\n");
 	while(!IsEmpty(q1) || !IsEmpty(q2) || !IsEmpty(q3)){
 		SimulateQueue(time,1,q1,q2,q3,gq);
 		SimulateQueue(time,2,q1,q2,q3,gq);
