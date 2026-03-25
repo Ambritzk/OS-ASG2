@@ -203,7 +203,7 @@ struct Process* ReadProcessesFromFile(int* sizeOfList){
 		char* dsprs;
 
 
-		
+
 
 		for(int i = 1; i <= 4; i++){
 			if(i == 1){
@@ -565,12 +565,19 @@ void final(int*time, struct Process* ListOfProcesses, int num,struct ProcessQueu
 
 void FinalTable(struct Process* ListOfProcesses, int sized){
 	printf("P\tAT\tBT\tCT\tTAT\tWT\n");
+	float avg_tat = 0;
+	float avg_wait = 0;
 	for(int i = 0; i < sized; i++){
 		struct Process* proc = &ListOfProcesses[i];
 		int tat = proc->completion_time - proc->arrival_time;
 		int wait = tat - proc->original_burst;
+		avg_tat += tat;
+		avg_wait += wait;
 		printf("%s\t%d\t%d\t%d\t%d\t%d\n",proc->pid, proc->arrival_time, proc->original_burst,proc->completion_time,tat,wait);
 	}
+	avg_tat /= sized;
+	avg_wait /= sized;
+	printf("AVERAGE TURNAROUND TIME = %f\nAVERAGE WAITING TIME = %f\n",avg_tat, avg_wait);
 }
 
 
@@ -599,12 +606,13 @@ void main(){
 
 	FinalTable(ListOfProcesses,number);
 	
-	for(int i = 0; i < number; i++){
-		free(ListOfProcesses[i].pid);
-	}
+
 
 
 	FreeChart(&gq);
+	for(int i = 0; i < number; i++){
+		free(ListOfProcesses[i].pid);
+	}
 	free(ListOfProcesses);
 
 }
